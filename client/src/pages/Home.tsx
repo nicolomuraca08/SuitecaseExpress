@@ -108,9 +108,10 @@ function StripeCheckoutForm({ onPaid }: { onPaid: () => void }) {
     if (!stripe || !elements) return;
     setIsPaying(true);
     setError("");
-    const result = await stripe.confirmPayment({ elements, confirmParams: { return_url: window.location.href }, redirect: "if_required" });
+    const result = await stripe.confirmPayment({ elements, redirect: "if_required" });
     if (result.error) setError(result.error.message ?? "Controlla i dati della carta e riprova.");
-    else onPaid();
+    else if (result.paymentIntent?.status === "succeeded") onPaid();
+    else setError(`Pagamento non ancora completato (${result.paymentIntent?.status ?? "stato sconosciuto"}).`);
     setIsPaying(false);
   };
 
@@ -119,7 +120,7 @@ function StripeCheckoutForm({ onPaid }: { onPaid: () => void }) {
       <PaymentElement options={{ layout: "tabs" }} />
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
       <Button type="submit" disabled={!stripe || isPaying} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white shadow-lg shadow-emerald-900/10 hover:bg-emerald-700">
-        <LockKeyhole className="size-4" /> {isPaying ? "Verifica in corso…" : "Sblocca il mio piano · 4,90 €"}
+        <LockKeyhole className="size-4" /> {isPaying ? "Verifica in corso…" : "Sblocca il mio piano · 3,99 €"}
       </Button>
       <p className="flex items-center justify-center gap-2 text-center text-xs text-slate-500"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamento sicuro con Stripe. Nessun dato carta viene salvato.</p>
     </form>
@@ -154,7 +155,7 @@ function Paywall({ plan, onPaid }: { plan: TravelPlan; onPaid: () => void }) {
       <div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-4 sm:p-5">
         {!clientSecret ? (
           <>
-            <div className="mb-4 flex items-center justify-between gap-4"><div><p className="font-bold text-slate-900">Sblocco una tantum</p><p className="text-sm text-slate-500">Valigia + itinerario completo</p></div><span className="price-tag">4,90 €</span></div>
+            <div className="mb-4 flex items-center justify-between gap-4"><div><p className="font-bold text-slate-900">Sblocco una tantum</p><p className="text-sm text-slate-500">Valigia + itinerario completo</p></div><span className="price-tag">3,99 €</span></div>
             <Button onClick={startPayment} disabled={loading} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white hover:bg-emerald-700">{loading ? "Preparo il pagamento…" : stripePromise ? <><CreditCard className="size-4" /> Continua al pagamento sicuro</> : <><Sparkles className="size-4" /> Sblocca anteprima demo</>} <ArrowRight className="size-4" /></Button>
             {!stripePromise && <p className="mt-3 text-center text-xs text-slate-500">Modalità demo: aggiungi STRIPE_SECRET_KEY e VITE_STRIPE_PUBLISHABLE_KEY per attivare il pagamento reale.</p>}
             {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}

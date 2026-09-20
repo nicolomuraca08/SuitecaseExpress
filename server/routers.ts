@@ -6,6 +6,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import Stripe from "stripe";
 
+export const PAYMENT_AMOUNT_CENTS = 399;
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -37,9 +39,9 @@ export const appRouter = router({
 
         const stripe = new Stripe(secretKey);
         const intent = await stripe.paymentIntents.create({
-          amount: 490,
+          amount: PAYMENT_AMOUNT_CENTS,
           currency: "eur",
-          automatic_payment_methods: { enabled: true },
+          payment_method_types: ["card"],
           description: "Valigia Perfetta & Itinerario Express",
           metadata: {
             destination: input.destination,
