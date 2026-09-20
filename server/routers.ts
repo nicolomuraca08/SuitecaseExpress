@@ -2,9 +2,11 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import Stripe from "stripe";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -16,13 +18,46 @@ export const appRouter = router({
       } as const;
     }),
   }),
+  payment: router({
+    createIntent: publicProcedure
+      .input(
+        z.object({
+          destination: z.string().trim().min(1).max(80),
+          duration: z.number().int().min(1).max(14),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        const secretKey = process.env.STRIPE_SECRET_KEY;
+        if (!secretKey) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Stripe non è ancora configurato. Usa la modalità demo o configura le chiavi in Settings → Payment.",
+          });
+        }
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+        const stripe = new Stripe(secretKey);
+        const intent = await stripe.paymentIntents.create({
+          amount: 490,
+          currency: "eur",
+          automatic_payment_methods: { enabled: true },
+          description: "Valigia Perfetta & Itinerario Express",
+          metadata: {
+            destination: input.destination,
+            duration: String(input.duration),
+            product: "travel-plan-unlock",
+          },
+        });
+
+        if (!intent.client_secret) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Stripe non ha restituito un client secret valido.",
+          });
+        }
+
+        return { clientSecret: intent.client_secret };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
