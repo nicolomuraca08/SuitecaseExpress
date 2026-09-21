@@ -1,29 +1,12 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { jsPDF } from "jspdf";
 import {
-  ArrowRight,
-  CalendarDays,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  ClipboardCheck,
-  Copy,
-  CreditCard,
-  Download,
-  FileText,
-  Luggage,
-  LockKeyhole,
-  MapPin,
-  Plane,
-  RotateCcw,
-  ShieldCheck,
-  Sparkles,
-  SunMedium,
-  Ticket,
-  Users,
-  WalletCards,
+  ArrowRight, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck,
+  Copy, CreditCard, Download, FileText, Luggage, LockKeyhole, MapPin, Plane,
+  Plus, RotateCcw, ShieldCheck, Sparkles, SunMedium, Ticket, Trash2, Users,
+  WalletCards, Umbrella, Utensils, Coins, AlertTriangle, CloudRain, ThermometerSun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,211 +15,164 @@ import { trpc } from "@/lib/trpc";
 type Month = "Gennaio" | "Febbraio" | "Marzo" | "Aprile" | "Maggio" | "Giugno" | "Luglio" | "Agosto" | "Settembre" | "Ottobre" | "Novembre" | "Dicembre";
 type Luggage = "Solo Zaino" | "Trolley 10kg" | "Stiva";
 type Traveler = "Da solo/a" | "Coppia" | "Bambini" | "Amici";
+type WeatherDay = { date: string; code: number; min: number; max: number; precipitation: number };
+type WeatherForecast = { city: string; timezone: string; days: WeatherDay[]; rainy: boolean; sunny: boolean };
 type ChecklistCategory = { title: string; icon: string; items: string[] };
-type TripDay = { day: number; morning: string; afternoon: string; evening: string };
-type TravelPlan = { destination: string; month: Month; duration: number; luggage: Luggage; traveler: Traveler; categories: ChecklistCategory[]; itinerary: TripDay[] };
+type TripDay = { day: number; date: string; morning: string; afternoon: string; evening: string };
+type TravelInsights = { dishes: string[]; traps: string; currency: string; tips: string };
+type TravelPlan = { destination: string; month: Month; startDate: string; endDate: string; duration: number; luggage: Luggage; traveler: Traveler; categories: ChecklistCategory[]; itinerary: TripDay[]; weather?: WeatherForecast; insights: TravelInsights };
 
 const months: Month[] = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 const luggageOptions: Luggage[] = ["Solo Zaino", "Trolley 10kg", "Stiva"];
 const travelerOptions: Traveler[] = ["Da solo/a", "Coppia", "Bambini", "Amici"];
-
 const publicKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = publicKey ? loadStripe(publicKey) : null;
 
-export function buildPlan(destination: string, month: Month, duration: number, luggage: Luggage, traveler: Traveler): TravelPlan {
+function dateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function addDays(value: string, amount: number) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + amount);
+  return dateInputValue(date);
+}
+function inclusiveDays(start: string, end: string) {
+  return Math.max(1, Math.round((new Date(`${end}T12:00:00`).getTime() - new Date(`${start}T12:00:00`).getTime()) / 86400000) + 1);
+}
+function monthFromDate(value: string): Month {
+  return months[new Date(`${value}T12:00:00`).getMonth()];
+}
+function readableDate(value: string) {
+  return new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" }).format(new Date(`${value}T12:00:00`));
+}
+function weatherLabel(code: number) {
+  if (code >= 95) return "Temporale";
+  if (code >= 61) return "Pioggia";
+  if (code >= 51) return "Pioviggine";
+  if (code >= 3) return "Nuvoloso";
+  return "Sole";
+}
+function weatherEmoji(code: number) {
+  if (code >= 95) return "⛈️";
+  if (code >= 61) return "🌧️";
+  if (code >= 51) return "🌦️";
+  if (code >= 3) return "☁️";
+  return "☀️";
+}
+
+export async function fetchWeather(destination: string, startDate: string, endDate: string): Promise<WeatherForecast> {
+  const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=it&format=json`);
+  if (!geoResponse.ok) throw new Error("Impossibile trovare la destinazione.");
+  const geo = await geoResponse.json() as { results?: Array<{ name: string; latitude: number; longitude: number; timezone: string }> };
+  const place = geo.results?.[0];
+  if (!place) throw new Error("Destinazione non trovata. Prova con una città più precisa.");
+  const forecastResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${startDate}&end_date=${endDate}`);
+  if (!forecastResponse.ok) throw new Error("Previsioni meteo non disponibili per queste date.");
+  const forecast = await forecastResponse.json() as { daily?: { time: string[]; weather_code: number[]; temperature_2m_min: number[]; temperature_2m_max: number[]; precipitation_probability_max: number[] } };
+  const daily = forecast.daily;
+  if (!daily?.time?.length) throw new Error("Nessuna previsione disponibile per le date selezionate.");
+  const days = daily.time.map((date, index) => ({ date, code: daily.weather_code[index] ?? 0, min: Math.round(daily.temperature_2m_min[index] ?? 0), max: Math.round(daily.temperature_2m_max[index] ?? 0), precipitation: Math.round(daily.precipitation_probability_max[index] ?? 0) }));
+  return { city: place.name, timezone: place.timezone, days, rainy: days.some((day) => day.precipitation >= 35 || day.code >= 51), sunny: days.some((day) => day.code <= 2 && day.max >= 24) };
+}
+
+function getInsights(destination: string): TravelInsights {
+  const value = destination.toLowerCase();
+  if (value.includes("kyoto") || value.includes("giappone") || value.includes("tokyo")) return { dishes: ["Ramen artigianale", "Okonomiyaki", "Matcha e wagashi"], traps: "Diffida dei locali con menu fotografico e prezzi non esposti nelle zone più turistiche.", currency: "Yen giapponese (JPY). In Giappone le mance non sono normalmente richieste.", tips: "Nei ristoranti tradizionali basta ringraziare; arrotondare non è necessario." };
+  if (value.includes("lisbona") || value.includes("portogallo")) return { dishes: ["Bacalhau", "Pastel de nata", "Bifana"], traps: "Evita i ristoranti con camerieri insistenti vicino a Praça do Comércio: confronta sempre il menu.", currency: "Euro (EUR). La mancia è facoltativa, spesso si lascia il 5–10% per un buon servizio.", tips: "Controlla sempre se il servizio è già incluso nel conto." };
+  if (value.includes("puglia") || value.includes("italia") || value.includes("roma") || value.includes("milano")) return { dishes: ["Orecchiette alle cime di rapa", "Focaccia barese", "Gelato artigianale"], traps: "Per evitare prezzi turistici, allontanati di qualche strada dalle piazze principali e guarda dove mangiano i residenti.", currency: "Euro (EUR). La mancia non è obbligatoria; arrotondare è un gesto apprezzato.", tips: "Il coperto può essere indicato separatamente: controlla il menu prima di ordinare." };
+  return { dishes: ["Specialità stagionale locale", "Street food tipico", "Dolce tradizionale"], traps: "Evita i locali con menu tradotti in troppe lingue e senza prezzi chiari vicino ai monumenti.", currency: "Verifica il cambio della valuta locale rispetto all’Euro prima di partire.", tips: "Lascia la mancia solo se il servizio è stato buono e controlla prima eventuali costi di servizio." };
+}
+
+export function buildPlan(destination: string, startDate: string, endDate: string, luggage: Luggage, traveler: Traveler, weather?: WeatherForecast): TravelPlan {
   const place = destination.trim().replace(/\s+/g, " ");
-  const climate: Record<Month, string> = {
-    Gennaio: "freddo e variabile", Febbraio: "fresco, con possibili piogge", Marzo: "mite e variabile", Aprile: "mite e luminoso",
-    Maggio: "caldo ma piacevole", Giugno: "caldo e soleggiato", Luglio: "caldo e secco", Agosto: "caldo e vivace",
-    Settembre: "ancora caldo, con serate miti", Ottobre: "mite e autunnale", Novembre: "fresco e piovoso", Dicembre: "freddo e festivo",
-  };
-  const extraByTraveler: Record<Traveler, string[]> = {
-    "Da solo/a": ["Lucchetto TSA", "Mini taccuino di viaggio"],
-    Coppia: ["Adattatore doppio", "Borsa pieghevole condivisa"],
-    Bambini: ["Snack e borraccia per bambini", "Cambio completo di riserva", "Piccolo kit intrattenimento"],
-    Amici: ["Power bank condiviso", "Giochi da viaggio", "Borraccia riutilizzabile"],
-  };
-  const clothingCount = Math.min(6, Math.max(3, Math.ceil(duration / 2) + 2));
-  const clothes = [
-    `${clothingCount} cambi leggeri adatti al clima ${climate[month]}`,
-    "1 giacca leggera o strato caldo",
-    "Biancheria e calze per ogni giorno + 1 extra",
-    "Scarpe comode per camminare",
-    "Pigiama e costume da bagno",
-  ];
+  const duration = inclusiveDays(startDate, endDate);
+  const climate = weather?.rainy ? "variabile con possibili piogge" : weather?.sunny ? "caldo e soleggiato" : "mite e variabile";
+  const clothingCount = Math.min(8, Math.max(3, Math.ceil(duration / 2) + 2));
+  const clothes = [`${clothingCount} cambi adatti al clima ${climate}`, "1 giacca leggera o strato caldo", "Biancheria e calze per ogni giorno + 1 extra", "Scarpe comode per camminare", "Pigiama e costume da bagno"];
   if (luggage === "Solo Zaino") clothes.push("Sacca organizer comprimibile");
   if (luggage === "Stiva") clothes.push("Secondo paio di scarpe in custodia");
-
+  const beauty = ["Spazzolino e dentifricio formato viaggio", "Crema solare SPF 30+", "Mini kit farmaci personali", "Gel igienizzante"];
+  const extra = [...(traveler === "Da solo/a" ? ["Lucchetto TSA", "Mini taccuino di viaggio"] : traveler === "Coppia" ? ["Adattatore doppio", "Borsa pieghevole condivisa"] : traveler === "Bambini" ? ["Snack e borraccia per bambini", "Cambio completo di riserva", "Piccolo kit intrattenimento"] : ["Power bank condiviso", "Giochi da viaggio", "Borraccia riutilizzabile"]), "Borraccia vuota per i controlli"];
+  if (weather?.rainy) extra.push("Ombrello compatto o poncho impermeabile");
+  if (weather?.sunny && !beauty.includes("Crema solare SPF 30+")) beauty.push("Crema solare SPF 50+");
   const categories: ChecklistCategory[] = [
     { title: "Documenti", icon: "ticket", items: ["Documento d’identità valido", "Biglietti e prenotazioni offline", "Assicurazione viaggio", "Carta e un po’ di contanti"] },
     { title: "Abiti", icon: "shirt", items: clothes },
     { title: "Elettronica", icon: "bolt", items: ["Smartphone + caricatore", "Power bank", "Adattatore universale", "Auricolari"] },
-    { title: "Beauty", icon: "drop", items: ["Spazzolino e dentifricio formato viaggio", "Crema solare SPF 30+", "Mini kit farmaci personali", "Gel igienizzante"] },
-    { title: "Extra", icon: "sparkle", items: [...extraByTraveler[traveler], "Borraccia vuota per i controlli"] },
+    { title: "Beauty", icon: "drop", items: beauty },
+    { title: "Extra", icon: "sparkle", items: extra },
   ];
-
-  const itinerary: TripDay[] = Array.from({ length: duration }, (_, index) => {
+  const itinerary = Array.from({ length: duration }, (_, index) => {
     const day = index + 1;
+    const date = addDays(startDate, index);
     const focus = day === 1 ? "il centro storico" : day === duration ? "il quartiere più autentico" : `una zona speciale di ${place}`;
-    return {
-      day,
-      morning: day === 1 ? `Passeggiata di orientamento tra i simboli di ${place}` : `Colazione lenta e scoperta di ${focus}`,
-      afternoon: day === duration ? `Ultime botteghe, panorama e acquisti ricordo a ${place}` : `Esperienza locale: mercato, museo o sapore tipico di ${place}`,
-      evening: traveler === "Bambini" ? "Cena presto in un posto easy, poi rientro senza fretta" : `Aperitivo panoramico e cena tipica a ${place}`,
-    };
+    return { day, date, morning: day === 1 ? `Passeggiata di orientamento tra i simboli di ${place}` : `Colazione lenta e scoperta di ${focus}`, afternoon: day === duration ? `Ultime botteghe, panorama e acquisti ricordo a ${place}` : `Esperienza locale: mercato, museo o sapore tipico di ${place}`, evening: traveler === "Bambini" ? "Cena presto in un posto easy, poi rientro senza fretta" : `Aperitivo panoramico e cena tipica a ${place}` };
   });
-
-  return { destination: place, month, duration, luggage, traveler, categories, itinerary };
+  return { destination: place, month: monthFromDate(startDate), startDate, endDate, duration, luggage, traveler, categories, itinerary, weather, insights: getInsights(place) };
 }
 
 function IconBadge({ icon }: { icon: string }) {
-  const icons: Record<string, ReactNode> = {
-    ticket: <Ticket className="size-5" />, shirt: <Luggage className="size-5" />, bolt: <WalletCards className="size-5" />,
-    drop: <ShieldCheck className="size-5" />, sparkle: <Sparkles className="size-5" />,
-  };
+  const icons: Record<string, ReactNode> = { ticket: <Ticket className="size-5" />, shirt: <Luggage className="size-5" />, bolt: <WalletCards className="size-5" />, drop: <ShieldCheck className="size-5" />, sparkle: <Sparkles className="size-5" /> };
   return <span className="category-icon">{icons[icon]}</span>;
 }
 
 function StripeCheckoutForm({ onPaid }: { onPaid: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [isPaying, setIsPaying] = useState(false);
-  const [error, setError] = useState("");
-
-  const submitPayment = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!stripe || !elements) return;
-    setIsPaying(true);
-    setError("");
-    const result = await stripe.confirmPayment({ elements, redirect: "if_required" });
-    if (result.error) setError(result.error.message ?? "Controlla i dati della carta e riprova.");
-    else if (result.paymentIntent?.status === "succeeded") onPaid();
-    else setError(`Pagamento non ancora completato (${result.paymentIntent?.status ?? "stato sconosciuto"}).`);
-    setIsPaying(false);
-  };
-
-  return (
-    <form onSubmit={submitPayment} className="space-y-4">
-      <PaymentElement options={{ layout: "tabs" }} />
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-      <Button type="submit" disabled={!stripe || isPaying} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white shadow-lg shadow-emerald-900/10 hover:bg-emerald-700">
-        <LockKeyhole className="size-4" /> {isPaying ? "Verifica in corso…" : "Sblocca il mio piano · 3,99 €"}
-      </Button>
-      <p className="flex items-center justify-center gap-2 text-center text-xs text-slate-500"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamento sicuro con Stripe. Nessun dato carta viene salvato.</p>
-    </form>
-  );
+  const stripe = useStripe(); const elements = useElements(); const [isPaying, setIsPaying] = useState(false); const [error, setError] = useState("");
+  const submitPayment = async (event: FormEvent) => { event.preventDefault(); if (!stripe || !elements) return; setIsPaying(true); setError(""); const result = await stripe.confirmPayment({ elements, redirect: "if_required" }); if (result.error) setError(result.error.message ?? "Controlla i dati della carta e riprova."); else if (result.paymentIntent?.status === "succeeded") onPaid(); else setError(`Pagamento non ancora completato (${result.paymentIntent?.status ?? "stato sconosciuto"}).`); setIsPaying(false); };
+  return <form onSubmit={submitPayment} className="space-y-4"><PaymentElement options={{ layout: "tabs" }} />{error && <p className="text-sm font-medium text-red-600">{error}</p>}<Button type="submit" disabled={!stripe || isPaying} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white shadow-lg shadow-emerald-900/10 hover:bg-emerald-700"><LockKeyhole className="size-4" /> {isPaying ? "Verifica in corso…" : "Sblocca il mio piano · 3,99 €"}</Button><p className="flex items-center justify-center gap-2 text-center text-xs text-slate-500"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamento sicuro con Stripe. Nessun dato carta viene salvato.</p></form>;
 }
 
 function Paywall({ plan, onPaid }: { plan: TravelPlan; onPaid: () => void }) {
-  const [clientSecret, setClientSecret] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [clientSecret, setClientSecret] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
   const createIntent = trpc.payment.createIntent.useMutation({ onSuccess: ({ clientSecret: secret }) => setClientSecret(secret), onError: (err) => setError(err.message) });
+  const startPayment = () => { setError(""); if (!stripePromise) { onPaid(); return; } setLoading(true); createIntent.mutate({ destination: plan.destination, duration: plan.duration }, { onSettled: () => setLoading(false) }); };
+  return <section className="paywall-card" aria-labelledby="unlock-title"><div className="paywall-lock"><LockKeyhole className="size-5" /></div><p className="eyebrow text-emerald-700">Il tuo piano è pronto</p><h2 id="unlock-title" className="mt-2 font-display text-3xl font-black tracking-tight text-slate-950">Una valigia più leggera. Un viaggio più pieno.</h2><p className="mt-3 max-w-xl text-base leading-7 text-slate-600">Sblocca tutte le categorie, il meteo e ogni tappa personalizzata per {plan.destination}.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{[[<ClipboardCheck className="size-4" />, "Checklist completa"], [<CalendarDays className="size-4" />, `${plan.duration} giorni organizzati`], [<FileText className="size-4" />, "PDF e calendario"]].map(([icon, label]) => <div key={label as string} className="benefit-pill">{icon}<span>{label}</span></div>)}</div><div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-4 sm:p-5">{!clientSecret ? <><div className="mb-4 flex items-center justify-between gap-4"><div><p className="font-bold text-slate-900">Sblocco una tantum</p><p className="text-sm text-slate-500">Valigia + itinerario completo</p></div><span className="price-tag">3,99 €</span></div><Button onClick={startPayment} disabled={loading} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white hover:bg-emerald-700">{loading ? "Preparo il pagamento…" : stripePromise ? <><CreditCard className="size-4" /> Continua al pagamento sicuro</> : <><Sparkles className="size-4" /> Sblocca anteprima demo</>} <ArrowRight className="size-4" /></Button>{!stripePromise && <p className="mt-3 text-center text-xs text-slate-500">Modalità demo: configura le chiavi Stripe per attivare il pagamento reale.</p>}{error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}</> : <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#059669", borderRadius: "16px", fontFamily: "Manrope, sans-serif" } } }}><StripeCheckoutForm onPaid={onPaid} /></Elements>}</div></section>;
+}
 
-  const startPayment = () => {
-    setError("");
-    if (!stripePromise) {
-      onPaid();
-      return;
-    }
-    setLoading(true);
-    createIntent.mutate({ destination: plan.destination, duration: plan.duration }, { onSettled: () => setLoading(false) });
-  };
-
-  return (
-    <section className="paywall-card" aria-labelledby="unlock-title">
-      <div className="paywall-lock"><LockKeyhole className="size-5" /></div>
-      <p className="eyebrow text-emerald-700">Il tuo piano è pronto</p>
-      <h2 id="unlock-title" className="mt-2 font-display text-3xl font-black tracking-tight text-slate-950">Una valigia più leggera. Un viaggio più pieno.</h2>
-      <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">Sblocca tutte le categorie della checklist e ogni tappa personalizzata per {plan.destination}. L’anteprima ti mostra il metodo; il piano completo resta tutto tuo.</p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        {[[<ClipboardCheck className="size-4" />, "Checklist completa"], [<CalendarDays className="size-4" />, `${plan.duration} giorni organizzati`], [<FileText className="size-4" />, "PDF pronto da portare"]].map(([icon, label]) => <div key={label as string} className="benefit-pill">{icon}<span>{label}</span></div>)}
-      </div>
-      <div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-4 sm:p-5">
-        {!clientSecret ? (
-          <>
-            <div className="mb-4 flex items-center justify-between gap-4"><div><p className="font-bold text-slate-900">Sblocco una tantum</p><p className="text-sm text-slate-500">Valigia + itinerario completo</p></div><span className="price-tag">3,99 €</span></div>
-            <Button onClick={startPayment} disabled={loading} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white hover:bg-emerald-700">{loading ? "Preparo il pagamento…" : stripePromise ? <><CreditCard className="size-4" /> Continua al pagamento sicuro</> : <><Sparkles className="size-4" /> Sblocca anteprima demo</>} <ArrowRight className="size-4" /></Button>
-            {!stripePromise && <p className="mt-3 text-center text-xs text-slate-500">Modalità demo: aggiungi STRIPE_SECRET_KEY e VITE_STRIPE_PUBLISHABLE_KEY per attivare il pagamento reale.</p>}
-            {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
-          </>
-        ) : (
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#059669", borderRadius: "16px", fontFamily: "Manrope, sans-serif" } } }}><StripeCheckoutForm onPaid={onPaid} /></Elements>
-        )}
-      </div>
-    </section>
-  );
+function buildICS(plan: TravelPlan) {
+  const escape = (value: string) => value.replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const date = (value: string) => value.replaceAll("-", "");
+  const events = plan.itinerary.flatMap((day) => [
+    ["Mattina", day.morning, "09:00", "12:00"], ["Pomeriggio", day.afternoon, "14:00", "17:00"], ["Sera", day.evening, "19:00", "22:00"],
+  ].map(([label, text, start, end]) => `BEGIN:VEVENT\nUID:valigia-${plan.startDate}-${day.day}-${label}@itinerario-express\nDTSTART:${date(day.date)}T${start.replace(":", "")}00\nDTEND:${date(day.date)}T${end.replace(":", "")}00\nSUMMARY:${escape(`${label} · ${plan.destination}`)}\nDESCRIPTION:${escape(text)}\nEND:VEVENT`));
+  return `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Valigia Perfetta//Itinerario Express//IT\nCALSCALE:GREGORIAN\n${events.join("\n")}\nEND:VCALENDAR`;
 }
 
 export default function Home() {
-  const [destination, setDestination] = useState("");
-  const [month, setMonth] = useState<Month>("Maggio");
-  const [duration, setDuration] = useState(4);
-  const [luggage, setLuggage] = useState<Luggage>("Trolley 10kg");
-  const [traveler, setTraveler] = useState<Traveler>("Da solo/a");
-  const [plan, setPlan] = useState<TravelPlan | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
-  const [done, setDone] = useState<Record<string, boolean>>({});
-  const [notice, setNotice] = useState("");
-
-  const allItems = useMemo(() => plan?.categories.flatMap((category) => category.items) ?? [], [plan]);
-  const doneCount = allItems.filter((item) => done[item]).length;
-  const reportText = plan ? `VALIGIA PERFETTA · ${plan.destination}\n${plan.duration} giorni · ${plan.month} · ${plan.luggage} · ${plan.traveler}\n\nCHECKLIST\n${plan.categories.map((category) => `\n${category.title}\n${category.items.map((item) => `□ ${item}`).join("\n")}`).join("\n")}\n\nITINERARIO\n${plan.itinerary.map((day) => `\nGIORNO ${day.day}\nMattina: ${day.morning}\nPomeriggio: ${day.afternoon}\nSera: ${day.evening}`).join("\n")}` : "";
+  const tomorrow = useMemo(() => { const date = new Date(); date.setDate(date.getDate() + 1); return dateInputValue(date); }, []);
+  const defaultReturn = useMemo(() => addDays(tomorrow, 3), [tomorrow]);
+  const [destination, setDestination] = useState(""); const [startDate, setStartDate] = useState(tomorrow); const [endDate, setEndDate] = useState(defaultReturn); const [luggage, setLuggage] = useState<Luggage>("Trolley 10kg"); const [traveler, setTraveler] = useState<Traveler>("Da solo/a"); const [plan, setPlan] = useState<TravelPlan | null>(null); const [unlocked, setUnlocked] = useState(false); const [done, setDone] = useState<Record<string, boolean>>({}); const [notice, setNotice] = useState(""); const [weatherLoading, setWeatherLoading] = useState(false); const [weatherError, setWeatherError] = useState(""); const [newItem, setNewItem] = useState(""); const weatherRequest = useRef(0);
+  const allItems = useMemo(() => plan?.categories.flatMap((category) => category.items) ?? [], [plan]); const doneCount = allItems.filter((item) => done[item]).length;
+  const reportText = plan ? `VALIGIA PERFETTA · ${plan.destination}\n${readableDate(plan.startDate)} – ${readableDate(plan.endDate)} · ${plan.duration} giorni · ${plan.luggage} · ${plan.traveler}\n\nCHECKLIST\n${plan.categories.map((category) => `\n${category.title}\n${category.items.map((item) => `${done[item] ? "✓" : "□"} ${item}`).join("\n")}`).join("\n")}\n\nITINERARIO\n${plan.itinerary.map((day) => `\nGIORNO ${day.day} · ${readableDate(day.date)}\nMattina: ${day.morning}\nPomeriggio: ${day.afternoon}\nSera: ${day.evening}`).join("\n")}` : "";
 
   const generate = (event: FormEvent) => {
     event.preventDefault();
-    if (!destination.trim()) return;
-    setPlan(buildPlan(destination, month, duration, luggage, traveler));
-    setUnlocked(false);
-    setDone({});
-    setNotice("");
+    if (!destination.trim() || endDate < startDate) return;
+    const request = ++weatherRequest.current;
+    const initialPlan = buildPlan(destination, startDate, endDate, luggage, traveler);
+    setPlan(initialPlan); setUnlocked(false); setDone({}); setNotice(""); setWeatherError(""); setWeatherLoading(true);
     setTimeout(() => document.getElementById("preview")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
+    fetchWeather(destination, startDate, endDate).then((weather) => { if (request !== weatherRequest.current) return; setPlan((current) => current ? buildPlan(current.destination, current.startDate, current.endDate, current.luggage, current.traveler, weather) : current); }).catch((error: unknown) => { if (request === weatherRequest.current) setWeatherError(error instanceof Error ? error.message : "Meteo non disponibile"); }).finally(() => { if (request === weatherRequest.current) setWeatherLoading(false); });
   };
+  const copyReport = async () => { await navigator.clipboard.writeText(reportText); setNotice("Resoconto copiato negli appunti."); setTimeout(() => setNotice(""), 2400); };
+  const downloadPdf = () => { if (!plan) return; const pdf = new jsPDF({ unit: "mm", format: "a4" }); const lines = pdf.splitTextToSize(reportText, 170); pdf.setFont("helvetica", "bold"); pdf.setFontSize(18); pdf.text("Valigia Perfetta", 20, 22); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.setTextColor(70, 83, 96); pdf.text(`Itinerario Express · ${plan.destination}`, 20, 29); pdf.setTextColor(24, 38, 53); pdf.setFontSize(10); let y = 40; lines.forEach((line: string) => { if (y > 278) { pdf.addPage(); y = 20; } pdf.text(line, 20, y); y += 5; }); pdf.save(`valigia-perfetta-${plan.destination.toLowerCase().replace(/\s+/g, "-")}.pdf`); };
+  const addChecklistItem = () => { const item = newItem.trim(); if (!item || !plan) return; setPlan({ ...plan, categories: plan.categories.map((category) => category.title === "Extra" ? { ...category, items: [...category.items, item] } : category) }); setNewItem(""); };
+  const removeChecklistItem = (categoryTitle: string, item: string) => { if (!plan) return; setPlan({ ...plan, categories: plan.categories.map((category) => category.title === categoryTitle ? { ...category, items: category.items.filter((value) => value !== item) } : category) }); setDone((current) => { const next = { ...current }; delete next[item]; return next; }); };
+  const downloadICS = () => { if (!plan) return; const blob = new Blob([buildICS(plan)], { type: "text/calendar;charset=utf-8" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `itinerario-${plan.destination.toLowerCase().replace(/\s+/g, "-")}.ics`; link.click(); URL.revokeObjectURL(link.href); };
 
-  const copyReport = async () => {
-    await navigator.clipboard.writeText(reportText);
-    setNotice("Resoconto copiato negli appunti.");
-    setTimeout(() => setNotice(""), 2400);
-  };
-
-  const downloadPdf = () => {
-    if (!plan) return;
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const lines = pdf.splitTextToSize(reportText, 170);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text("Valigia Perfetta", 20, 22);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(70, 83, 96);
-    pdf.text(`Itinerario Express · ${plan.destination}`, 20, 29);
-    pdf.setTextColor(24, 38, 53);
-    pdf.setFontSize(10);
-    let y = 40;
-    lines.forEach((line: string) => { if (y > 278) { pdf.addPage(); y = 20; } pdf.text(line, 20, y); y += 5; });
-    pdf.save(`valigia-perfetta-${plan.destination.toLowerCase().replace(/\s+/g, "-")}.pdf`);
-  };
-
-  return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f8fbfa] text-slate-900">
-      <header className="container flex items-center justify-between py-5 sm:py-7">
-        <div className="flex items-center gap-3"><div className="brand-mark"><Plane className="size-5" /></div><div><p className="font-display text-lg font-black leading-none tracking-tight">Valigia Perfetta</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Itinerario Express</p></div></div>
-        <div className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm sm:flex"><ShieldCheck className="size-3.5 text-emerald-600" /> Pronto in 60 secondi</div>
-      </header>
-
-      <main className="container pb-16">
-        <section className="hero-grid">
-          <div className="hero-copy"><div className="eyebrow"><Sparkles className="size-4" /> Il tuo copilota di viaggio</div><h1 className="mt-4 max-w-3xl font-display text-5xl font-black leading-[0.98] tracking-[-0.045em] text-slate-950 sm:text-7xl">Parti leggero.<br /><span className="text-emerald-600">Vivi di più.</span></h1><p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">Una checklist senza dimenticanze e un itinerario che sa già dove vuoi andare. Inserisci i dettagli, al resto pensiamo noi.</p><div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold text-slate-600"><span className="hero-chip"><Luggage className="size-4 text-emerald-600" /> Valigia su misura</span><span className="hero-chip"><MapPin className="size-4 text-sky-600" /> Tappe smart</span><span className="hero-chip"><ShieldCheck className="size-4 text-emerald-600" /> Niente stress</span></div></div>
-          <div className="hero-orbit"><div className="orbit-card orbit-card-top"><SunMedium className="size-4 text-amber-500" /><span>Il meteo, considerato</span></div><div className="suitcase-illustration"><div className="suitcase-handle" /><div className="suitcase-body"><div className="suitcase-line" /><div className="suitcase-sticker">✦</div><div className="suitcase-wheel wheel-left" /><div className="suitcase-wheel wheel-right" /></div></div><div className="orbit-card orbit-card-bottom"><CheckCircle2 className="size-4 text-emerald-600" /><span>Ogni cosa al suo posto</span></div></div>
-        </section>
-
-        <section className="form-card" aria-label="Dati del viaggio"><div className="section-kicker"><span className="step-number">01</span><div><p className="eyebrow text-emerald-700">Partiamo da te</p><h2 className="font-display text-2xl font-black tracking-tight sm:text-3xl">Raccontaci il viaggio</h2></div></div><form onSubmit={generate} className="mt-7 grid gap-5 lg:grid-cols-12"><label className="field lg:col-span-6"><span>Destinazione</span><div className="input-wrap"><MapPin className="size-5 text-emerald-600" /><input required value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Es. Lisbona, Kyoto, Puglia…" /></div></label><label className="field lg:col-span-3"><span>Mese</span><div className="select-wrap"><CalendarDays className="size-4 text-slate-400" /><select value={month} onChange={(event) => setMonth(event.target.value as Month)}>{months.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown className="pointer-events-none size-4 text-slate-400" /></div></label><label className="field lg:col-span-3"><span>Durata <strong>{duration} {duration === 1 ? "giorno" : "giorni"}</strong></span><input className="range" type="range" min="1" max="14" value={duration} onChange={(event) => setDuration(Number(event.target.value))} /><div className="range-labels"><span>1</span><span>14</span></div></label><label className="field lg:col-span-4"><span>Tipo bagaglio</span><div className="select-wrap"><Luggage className="size-4 text-slate-400" /><select value={luggage} onChange={(event) => setLuggage(event.target.value as Luggage)}>{luggageOptions.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown className="pointer-events-none size-4 text-slate-400" /></div></label><label className="field lg:col-span-4"><span>Chi viaggia?</span><div className="select-wrap"><Users className="size-4 text-slate-400" /><select value={traveler} onChange={(event) => setTraveler(event.target.value as Traveler)}>{travelerOptions.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown className="pointer-events-none size-4 text-slate-400" /></div></label><div className="flex items-end lg:col-span-4"><Button type="submit" className="generate-btn w-full"><Sparkles className="size-5" /> Genera Valigia & Itinerario <ArrowRight className="size-4" /></Button></div></form></section>
-
-        {plan && <div id="preview" className="result-area"><div className="result-heading"><div><div className="eyebrow text-emerald-700"><CheckCircle2 className="size-4" /> Piano pronto per te</div><h2 className="mt-2 font-display text-3xl font-black tracking-tight sm:text-4xl">{plan.destination}, arriviamo.</h2><p className="mt-2 text-slate-500">{plan.duration} giorni · {plan.month} · {plan.luggage} · {plan.traveler}</p></div>{unlocked && <Button variant="outline" onClick={() => { setPlan(null); setDestination(""); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-full border-slate-200 bg-white"><RotateCcw className="size-4" /> Nuovo viaggio</Button>}</div>
-          {!unlocked ? <><div className="preview-grid"><div className="preview-panel"><div className="panel-heading"><span className="panel-icon"><Luggage className="size-5" /></span><div><p className="eyebrow text-slate-500">Anteprima</p><h3 className="font-display text-xl font-black">Cosa finisce in valigia</h3></div></div><div className="mt-5 space-y-3">{allItems.slice(0, 3).map((item) => <div key={item} className="preview-item"><span className="preview-check"><Check className="size-3.5" /></span>{item}</div>)}<div className="blur-stack"><div>Adattatore universale e power bank</div><div>Crema solare e kit farmaci</div><div>Extra pensati per chi viaggia con te</div></div></div></div><div className="preview-panel itinerary-preview"><div className="panel-heading"><span className="panel-icon panel-icon-blue"><CalendarDays className="size-5" /></span><div><p className="eyebrow text-slate-500">Giorno 01</p><h3 className="font-display text-xl font-black">Il ritmo della tua giornata</h3></div></div><div className="mt-5 rounded-2xl bg-[#eaf8f3] p-4"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Mattina</p><p className="mt-2 font-semibold leading-6 text-slate-800">{plan.itinerary[0].morning}</p></div><div className="blur-stack mt-3"><div>Pomeriggio · esperienza locale</div><div>Sera · cena tipica e passeggiata</div></div></div></div><Paywall plan={plan} onPaid={() => setUnlocked(true)} /></> : <div className="unlocked-layout"><div className="success-banner"><div className="success-icon"><CheckCircle2 className="size-6" /></div><div><p className="font-display text-xl font-black">Piano sbloccato. Buon viaggio!</p><p className="mt-1 text-sm text-emerald-800/80">Spunta le cose mentre prepari la valigia e porta il PDF con te.</p></div><div className="ml-auto hidden rounded-full bg-white/80 px-3 py-2 text-sm font-bold text-emerald-700 sm:block">{doneCount}/{allItems.length} pronti</div></div><div className="action-row"><p className="text-sm text-slate-500"><span className="font-bold text-slate-800">{doneCount}</span> di {allItems.length} oggetti pronti</p><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={copyReport} className="rounded-full border-slate-200 bg-white"><Copy className="size-4" /> Copia Resoconto</Button><Button onClick={downloadPdf} className="rounded-full bg-slate-950 text-white hover:bg-slate-800"><Download className="size-4" /> Scarica PDF</Button></div></div>{notice && <div className="notice"><CheckCircle2 className="size-4" /> {notice}</div>}<div className="unlocked-grid"><div className="checklist-column"><div className="panel-heading mb-5"><span className="panel-icon"><ClipboardCheck className="size-5" /></span><div><p className="eyebrow text-slate-500">Checklist interattiva</p><h3 className="font-display text-2xl font-black">Prepara con calma</h3></div></div>{plan.categories.map((category) => <div key={category.title} className="category-card"><div className="flex items-center gap-3"><IconBadge icon={category.icon} /><div><h4 className="font-display text-lg font-black">{category.title}</h4><p className="text-xs text-slate-400">{category.items.length} elementi</p></div></div><div className="mt-4 space-y-3">{category.items.map((item) => <label key={item} className={`check-row ${done[item] ? "is-done" : ""}`}><Checkbox checked={Boolean(done[item])} onCheckedChange={(checked) => setDone((current) => ({ ...current, [item]: Boolean(checked) }))} /><span>{item}</span></label>)}</div></div>)}</div><div className="itinerary-column"><div className="panel-heading mb-5"><span className="panel-icon panel-icon-blue"><MapPin className="size-5" /></span><div><p className="eyebrow text-slate-500">Itinerario Express</p><h3 className="font-display text-2xl font-black">Giorno dopo giorno</h3></div></div>{plan.itinerary.map((day) => <div key={day.day} className="day-card"><div className="day-number">{String(day.day).padStart(2, "0")}</div><div className="flex-1"><p className="eyebrow text-emerald-700">Giorno {day.day}</p><div className="timeline"><div><span className="timeline-label">Mattina</span><p>{day.morning}</p></div><div><span className="timeline-label">Pomeriggio</span><p>{day.afternoon}</p></div><div><span className="timeline-label">Sera</span><p>{day.evening}</p></div></div></div></div>)}</div></div></div>}
-        </div>}
-      </main>
-      <footer className="container flex flex-col gap-3 border-t border-slate-200/80 py-7 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>Valigia Perfetta · Progettato per partire più sereni.</p><p className="flex items-center gap-2"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamenti protetti da Stripe</p></footer>
-    </div>
-  );
+  return <div className="min-h-screen overflow-x-hidden bg-[#f8fbfa] text-slate-900">
+    <header className="container flex items-center justify-between py-5 sm:py-7"><div className="flex items-center gap-3"><div className="brand-mark"><Plane className="size-5" /></div><div><p className="font-display text-lg font-black leading-none tracking-tight">Valigia Perfetta</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Itinerario Express</p></div></div><div className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm sm:flex"><ShieldCheck className="size-3.5 text-emerald-600" /> Pronto in 60 secondi</div></header>
+    <main className="container pb-16">
+      <section className="hero-grid"><div className="hero-copy"><div className="eyebrow"><Sparkles className="size-4" /> Il tuo copilota di viaggio</div><h1 className="mt-4 max-w-3xl font-display text-5xl font-black leading-[0.98] tracking-[-0.045em] text-slate-950 sm:text-7xl">Parti leggero.<br /><span className="text-emerald-600">Vivi di più.</span></h1><p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">Una checklist senza dimenticanze e un itinerario che sa già dove vuoi andare. Inserisci le date, al resto pensiamo noi.</p><div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold text-slate-600"><span className="hero-chip"><Luggage className="size-4 text-emerald-600" /> Valigia su misura</span><span className="hero-chip"><MapPin className="size-4 text-sky-600" /> Tappe smart</span><span className="hero-chip"><ShieldCheck className="size-4 text-emerald-600" /> Niente stress</span></div></div><div className="hero-orbit"><div className="orbit-card orbit-card-top"><SunMedium className="size-4 text-amber-500" /><span>Il meteo, considerato</span></div><div className="suitcase-illustration"><div className="suitcase-handle" /><div className="suitcase-body"><div className="suitcase-line" /><div className="suitcase-sticker">✦</div><div className="suitcase-wheel wheel-left" /><div className="suitcase-wheel wheel-right" /></div></div><div className="orbit-card orbit-card-bottom"><CheckCircle2 className="size-4 text-emerald-600" /><span>Ogni cosa al suo posto</span></div></div></section>
+      <section className="safety-alert" aria-label="Sicurezza e documenti"><div className="safety-alert-title"><AlertTriangle className="size-5" /> Prima di partire, controlla</div><div className="safety-items"><span>✓ Validità documento: almeno 6 mesi</span><span>✓ Check-in online per evitare penali</span><span>✓ Tessera Sanitaria Europea o assicurazione</span></div></section>
+      <section className="form-card" aria-label="Dati del viaggio"><div className="section-kicker"><span className="step-number">01</span><div><p className="eyebrow text-emerald-700">Partiamo da te</p><h2 className="font-display text-2xl font-black tracking-tight sm:text-3xl">Raccontaci il viaggio</h2></div></div><form onSubmit={generate} className="mt-7 grid gap-5 lg:grid-cols-12"><label className="field lg:col-span-4"><span>Destinazione</span><div className="input-wrap"><MapPin className="size-5 text-emerald-600" /><input required value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Es. Lisbona, Kyoto, Puglia…" /></div></label><label className="field lg:col-span-2"><span>Partenza</span><div className="input-wrap"><CalendarDays className="size-4 text-slate-400" /><input required type="date" value={startDate} min={tomorrow} max={addDays(tomorrow, 15)} onChange={(event) => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(addDays(event.target.value, 1)); }} /></div></label><label className="field lg:col-span-2"><span>Ritorno</span><div className="input-wrap"><CalendarDays className="size-4 text-slate-400" /><input required type="date" value={endDate} min={addDays(startDate, 1)} max={addDays(startDate, 15)} onChange={(event) => setEndDate(event.target.value)} /></div></label><label className="field lg:col-span-2"><span>Tipo bagaglio</span><div className="select-wrap"><Luggage className="size-4 text-slate-400" /><select value={luggage} onChange={(event) => setLuggage(event.target.value as Luggage)}>{luggageOptions.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown className="pointer-events-none size-4 text-slate-400" /></div></label><label className="field lg:col-span-2"><span>Chi viaggia?</span><div className="select-wrap"><Users className="size-4 text-slate-400" /><select value={traveler} onChange={(event) => setTraveler(event.target.value as Traveler)}>{travelerOptions.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown className="pointer-events-none size-4 text-slate-400" /></div></label><div className="lg:col-span-12"><Button type="submit" className="generate-btn w-full"><Sparkles className="size-5" /> Genera Valigia & Itinerario <ArrowRight className="size-4" /></Button></div></form><p className="mt-3 text-xs text-slate-400">Previsioni disponibili fino a 16 giorni dalla partenza.</p></section>
+      {plan && <div id="preview" className="result-area"><div className="result-heading"><div><div className="eyebrow text-emerald-700"><CheckCircle2 className="size-4" /> Piano pronto per te</div><h2 className="mt-2 font-display text-3xl font-black tracking-tight sm:text-4xl">{plan.destination}, arriviamo.</h2><p className="mt-2 text-slate-500">{readableDate(plan.startDate)} – {readableDate(plan.endDate)} · {plan.duration} giorni · {plan.luggage} · {plan.traveler}</p></div>{unlocked && <Button variant="outline" onClick={() => { setPlan(null); setDestination(""); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-full border-slate-200 bg-white"><RotateCcw className="size-4" /> Nuovo viaggio</Button>}</div>
+        {weatherLoading && <div className="weather-loading"><SunMedium className="size-4 animate-spin" /> Recupero il meteo per personalizzare la valigia…</div>}
+        {weatherError && <div className="weather-error"><CloudRain className="size-4" /> {weatherError} La checklist resta disponibile con suggerimenti base.</div>}
+        {plan.weather && <div className="weather-widget"><div><p className="eyebrow text-emerald-700"><ThermometerSun className="size-4" /> Meteo previsto · {plan.weather.city}</p><p className="mt-1 text-sm text-slate-500">{plan.weather.rainy ? "Possibili piogge: abbiamo aggiunto una protezione." : plan.weather.sunny ? "Giornate luminose: crema solare in valigia." : "Clima variabile: strati leggeri consigliati."}</p></div><div className="weather-days">{plan.weather.days.slice(0, 4).map((day) => <div key={day.date} className="weather-day"><span>{readableDate(day.date)}</span><strong>{weatherEmoji(day.code)}</strong><b>{day.max}°</b><small>{weatherLabel(day.code)}</small></div>)}</div></div>}
+        {!unlocked ? <><div className="preview-grid"><div className="preview-panel"><div className="panel-heading"><span className="panel-icon"><Luggage className="size-5" /></span><div><p className="eyebrow text-slate-500">Anteprima</p><h3 className="font-display text-xl font-black">Cosa finisce in valigia</h3></div></div><div className="mt-5 space-y-3">{allItems.slice(0, 3).map((item) => <div key={item} className="preview-item"><span className="preview-check"><Check className="size-3.5" /></span>{item}</div>)}<div className="blur-stack"><div>Adattatore universale e power bank</div><div>Crema solare e kit farmaci</div><div>Extra pensati per chi viaggia con te</div></div></div></div><div className="preview-panel itinerary-preview"><div className="panel-heading"><span className="panel-icon panel-icon-blue"><CalendarDays className="size-5" /></span><div><p className="eyebrow text-slate-500">Giorno 01</p><h3 className="font-display text-xl font-black">Il ritmo della tua giornata</h3></div></div><div className="mt-5 rounded-2xl bg-[#eaf8f3] p-4"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Mattina</p><p className="mt-2 font-semibold leading-6 text-slate-800">{plan.itinerary[0].morning}</p></div><div className="blur-stack mt-3"><div>Pomeriggio · esperienza locale</div><div>Sera · cena tipica e passeggiata</div></div></div></div><Paywall plan={plan} onPaid={() => setUnlocked(true)} /></> : <div className="unlocked-layout"><div className="success-banner"><div className="success-icon"><CheckCircle2 className="size-6" /></div><div><p className="font-display text-xl font-black">Piano sbloccato. Buon viaggio!</p><p className="mt-1 text-sm text-emerald-800/80">Spunta le cose mentre prepari la valigia e porta il piano con te.</p></div><div className="ml-auto hidden rounded-full bg-white/80 px-3 py-2 text-sm font-bold text-emerald-700 sm:block">{doneCount}/{allItems.length} pronti</div></div><div className="action-row"><p className="text-sm text-slate-500"><span className="font-bold text-slate-800">{doneCount}</span> di {allItems.length} oggetti pronti</p><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={copyReport} className="rounded-full border-slate-200 bg-white"><Copy className="size-4" /> Copia Resoconto</Button><Button onClick={downloadPdf} className="rounded-full bg-slate-950 text-white hover:bg-slate-800"><Download className="size-4" /> Scarica PDF</Button><Button onClick={downloadICS} className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700"><CalendarDays className="size-4" /> Calendario .ICS</Button></div></div>{notice && <div className="notice"><CheckCircle2 className="size-4" /> {notice}</div>}<div className="unlocked-grid"><div className="checklist-column"><div className="panel-heading mb-5"><span className="panel-icon"><ClipboardCheck className="size-5" /></span><div><p className="eyebrow text-slate-500">Checklist interattiva</p><h3 className="font-display text-2xl font-black">Prepara con calma</h3></div></div>{plan.categories.map((category) => <div key={category.title} className="category-card"><div className="flex items-center gap-3"><IconBadge icon={category.icon} /><div><h4 className="font-display text-lg font-black">{category.title}</h4><p className="text-xs text-slate-400">{category.items.length} elementi</p></div></div><div className="mt-4 space-y-3">{category.items.map((item) => <div key={`${category.title}-${item}`} className="check-row-wrap"><label className={`check-row ${done[item] ? "is-done" : ""}`}><Checkbox checked={Boolean(done[item])} onCheckedChange={(checked) => setDone((current) => ({ ...current, [item]: Boolean(checked) }))} /><span>{item}</span></label><button type="button" aria-label={`Rimuovi ${item}`} className="delete-item" onClick={() => removeChecklistItem(category.title, item)}><Trash2 className="size-4" /></button></div>)}</div>{category.title === "Extra" && <div className="add-item-row"><input value={newItem} onChange={(event) => setNewItem(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Aggiungi un oggetto personale" /><Button type="button" onClick={addChecklistItem} className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="size-4" /> Aggiungi</Button></div>}</div>)}</div><div className="itinerary-column"><div className="panel-heading mb-5"><span className="panel-icon panel-icon-blue"><MapPin className="size-5" /></span><div><p className="eyebrow text-slate-500">Itinerario Express</p><h3 className="font-display text-2xl font-black">Giorno dopo giorno</h3></div></div>{plan.itinerary.map((day) => <div key={day.day} className="day-card"><div className="day-number">{String(day.day).padStart(2, "0")}</div><div className="flex-1"><p className="eyebrow text-emerald-700">Giorno {day.day} · {readableDate(day.date)}</p><div className="timeline"><div><span className="timeline-label">Mattina</span><p>{day.morning}</p></div><div><span className="timeline-label">Pomeriggio</span><p>{day.afternoon}</p></div><div><span className="timeline-label">Sera</span><p>{day.evening}</p></div></div></div></div>)}<section className="insights-card"><div className="eyebrow text-emerald-700"><Utensils className="size-4" /> Food, trappole & valuta</div><div className="insights-grid"><div><h4>Da assaggiare</h4><ul>{plan.insights.dishes.map((dish) => <li key={dish}>• {dish}</li>)}</ul></div><div><h4>Attenzione alle trappole</h4><p>{plan.insights.traps}</p></div><div><h4><Coins className="inline size-4" /> Valuta e mance</h4><p>{plan.insights.currency}</p><p className="mt-2 text-xs text-slate-500">{plan.insights.tips}</p></div></div></section></div></div></div>}
+      </div>}
+    </main>
+    <footer className="container flex flex-col gap-3 border-t border-slate-200/80 py-7 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>Valigia Perfetta · Progettato per partire più sereni.</p><p className="flex items-center gap-2"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamenti protetti da Stripe</p></footer>
+  </div>;
 }
