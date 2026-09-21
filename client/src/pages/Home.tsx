@@ -16,7 +16,7 @@ type Month = "Gennaio" | "Febbraio" | "Marzo" | "Aprile" | "Maggio" | "Giugno" |
 type Luggage = "Solo Zaino" | "Trolley 10kg" | "Stiva";
 type Traveler = "Da solo/a" | "Coppia" | "Bambini" | "Amici";
 type WeatherDay = { date: string; code: number; min: number; max: number; precipitation: number };
-type WeatherForecast = { city: string; timezone: string; days: WeatherDay[]; rainy: boolean; sunny: boolean };
+type WeatherForecast = { city: string; country: string; countryCode: string; timezone: string; days: WeatherDay[]; rainy: boolean; sunny: boolean };
 type ChecklistCategory = { title: string; icon: string; items: string[] };
 type TripDay = { day: number; date: string; morning: string; afternoon: string; evening: string };
 type TravelInsights = { dishes: string[]; traps: string; currency: string; tips: string };
@@ -63,7 +63,7 @@ function weatherEmoji(code: number) {
 export async function fetchWeather(destination: string, startDate: string, endDate: string): Promise<WeatherForecast> {
   const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=it&format=json`);
   if (!geoResponse.ok) throw new Error("Impossibile trovare la destinazione.");
-  const geo = await geoResponse.json() as { results?: Array<{ name: string; latitude: number; longitude: number; timezone: string }> };
+  const geo = await geoResponse.json() as { results?: Array<{ name: string; country?: string; country_code?: string; latitude: number; longitude: number; timezone: string }> };
   const place = geo.results?.[0];
   if (!place) throw new Error("Destinazione non trovata. Prova con una città più precisa.");
   const forecastResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${startDate}&end_date=${endDate}`);
@@ -72,7 +72,7 @@ export async function fetchWeather(destination: string, startDate: string, endDa
   const daily = forecast.daily;
   if (!daily?.time?.length) throw new Error("Nessuna previsione disponibile per le date selezionate.");
   const days = daily.time.map((date, index) => ({ date, code: daily.weather_code[index] ?? 0, min: Math.round(daily.temperature_2m_min[index] ?? 0), max: Math.round(daily.temperature_2m_max[index] ?? 0), precipitation: Math.round(daily.precipitation_probability_max[index] ?? 0) }));
-  return { city: place.name, timezone: place.timezone, days, rainy: days.some((day) => day.precipitation >= 35 || day.code >= 51), sunny: days.some((day) => day.code <= 2 && day.max >= 24) };
+  return { city: place.name, country: place.country ?? "", countryCode: (place.country_code ?? "").toUpperCase(), timezone: place.timezone, days, rainy: days.some((day) => day.precipitation >= 35 || day.code >= 51), sunny: days.some((day) => day.code <= 2 && day.max >= 24) };
 }
 
 function getInsights(destination: string): TravelInsights {
@@ -83,7 +83,33 @@ function getInsights(destination: string): TravelInsights {
   return { dishes: ["Specialità stagionale locale", "Street food tipico", "Dolce tradizionale"], traps: "Evita i locali con menu tradotti in troppe lingue e senza prezzi chiari vicino ai monumenti.", currency: "Verifica il cambio della valuta locale rispetto all’Euro prima di partire.", tips: "Lascia la mancia solo se il servizio è stato buono e controlla prima eventuali costi di servizio." };
 }
 
-export function buildPlan(destination: string, startDate: string, endDate: string, luggage: Luggage, traveler: Traveler, weather?: WeatherForecast): TravelPlan {
+const mealAreasByCountry: Record<string, string> = { IT: "Italian", PT: "Portuguese", ES: "Spanish", FR: "French", DE: "German", GR: "Greek", JP: "Japanese", CN: "Chinese", IN: "Indian", MX: "Mexican", TH: "Thai", TR: "Turkish", US: "American", GB: "British", MA: "Moroccan", EG: "Egyptian", JM: "Jamaican", IE: "Irish", NL: "Dutch", PL: "Polish", HR: "Croatian", VN: "Vietnamese", MY: "Malaysian", PH: "Filipino" };
+
+export async function fetchDestinationInsights(destination: string, weather: WeatherForecast): Promise<TravelInsights> {
+  const fallback = getInsights(destination);
+  const countryCode = weather.countryCode.toLowerCase();
+  try {
+    const countryResponse = await fetch(`https://restcountries.com/v3.1/alpha/${encodeURIComponent(countryCode)}?fields=name,currencies`);
+    if (!countryResponse.ok) return fallback;
+    const countryData = await countryResponse.json() as Array<{ name?: { common?: string }; currencies?: Record<string, { name?: string; symbol?: string }> }>;
+    const country = countryData[0];
+    const currencyEntry = Object.entries(country?.currencies ?? {})[0];
+    const currency = currencyEntry ? `${currencyEntry[1].name ?? currencyEntry[0]} (${currencyEntry[0]}${currencyEntry[1].symbol ? ` · ${currencyEntry[1].symbol}` : ""})` : fallback.currency;
+    let dishes = fallback.dishes;
+    const area = mealAreasByCountry[weather.countryCode] ?? weather.country;
+    const mealResponse = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?a=${encodeURIComponent(area)}`);
+    if (mealResponse.ok) {
+      const meals = await mealResponse.json() as { meals?: Array<{ strMeal?: string }> };
+      const names = (meals.meals ?? []).map((meal) => meal.strMeal).filter((name): name is string => Boolean(name));
+      if (names.length >= 3) dishes = names.slice(0, 3);
+    }
+    return { ...fallback, dishes, currency: `Valuta locale: ${currency}. Per il cambio EUR, verifica il tasso del giorno prima di partire.`, traps: `A ${weather.city}, in ${country?.name?.common ?? weather.country}, confronta sempre menu e prezzi prima di sederti. ${fallback.traps}`, tips: fallback.tips };
+  } catch {
+    return fallback;
+  }
+}
+
+export function buildPlan(destination: string, startDate: string, endDate: string, luggage: Luggage, traveler: Traveler, weather?: WeatherForecast, insights?: TravelInsights): TravelPlan {
   const place = destination.trim().replace(/\s+/g, " ");
   const duration = inclusiveDays(startDate, endDate);
   const climate = weather?.rainy ? "variabile con possibili piogge" : weather?.sunny ? "caldo e soleggiato" : "mite e variabile";
@@ -108,7 +134,7 @@ export function buildPlan(destination: string, startDate: string, endDate: strin
     const focus = day === 1 ? "il centro storico" : day === duration ? "il quartiere più autentico" : `una zona speciale di ${place}`;
     return { day, date, morning: day === 1 ? `Passeggiata di orientamento tra i simboli di ${place}` : `Colazione lenta e scoperta di ${focus}`, afternoon: day === duration ? `Ultime botteghe, panorama e acquisti ricordo a ${place}` : `Esperienza locale: mercato, museo o sapore tipico di ${place}`, evening: traveler === "Bambini" ? "Cena presto in un posto easy, poi rientro senza fretta" : `Aperitivo panoramico e cena tipica a ${place}` };
   });
-  return { destination: place, month: monthFromDate(startDate), startDate, endDate, duration, luggage, traveler, categories, itinerary, weather, insights: getInsights(place) };
+  return { destination: place, month: monthFromDate(startDate), startDate, endDate, duration, luggage, traveler, categories, itinerary, weather, insights: insights ?? getInsights(place) };
 }
 
 function IconBadge({ icon }: { icon: string }) {
@@ -152,7 +178,7 @@ export default function Home() {
     const initialPlan = buildPlan(destination, startDate, endDate, luggage, traveler);
     setPlan(initialPlan); setUnlocked(false); setDone({}); setNotice(""); setWeatherError(""); setWeatherLoading(true);
     setTimeout(() => document.getElementById("preview")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
-    fetchWeather(destination, startDate, endDate).then((weather) => { if (request !== weatherRequest.current) return; setPlan((current) => current ? buildPlan(current.destination, current.startDate, current.endDate, current.luggage, current.traveler, weather) : current); }).catch((error: unknown) => { if (request === weatherRequest.current) setWeatherError(error instanceof Error ? error.message : "Meteo non disponibile"); }).finally(() => { if (request === weatherRequest.current) setWeatherLoading(false); });
+    fetchWeather(destination, startDate, endDate).then(async (weather) => { if (request !== weatherRequest.current) return; const insights = await fetchDestinationInsights(destination, weather); if (request !== weatherRequest.current) return; setPlan((current) => current ? buildPlan(current.destination, current.startDate, current.endDate, current.luggage, current.traveler, weather, insights) : current); }).catch((error: unknown) => { if (request === weatherRequest.current) setWeatherError(error instanceof Error ? error.message : "Dati destinazione non disponibili"); }).finally(() => { if (request === weatherRequest.current) setWeatherLoading(false); });
   };
   const copyReport = async () => { await navigator.clipboard.writeText(reportText); setNotice("Resoconto copiato negli appunti."); setTimeout(() => setNotice(""), 2400); };
   const downloadPdf = () => { if (!plan) return; const pdf = new jsPDF({ unit: "mm", format: "a4" }); const lines = pdf.splitTextToSize(reportText, 170); pdf.setFont("helvetica", "bold"); pdf.setFontSize(18); pdf.text("Valigia Perfetta", 20, 22); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.setTextColor(70, 83, 96); pdf.text(`Itinerario Express · ${plan.destination}`, 20, 29); pdf.setTextColor(24, 38, 53); pdf.setFontSize(10); let y = 40; lines.forEach((line: string) => { if (y > 278) { pdf.addPage(); y = 20; } pdf.text(line, 20, y); y += 5; }); pdf.save(`valigia-perfetta-${plan.destination.toLowerCase().replace(/\s+/g, "-")}.pdf`); };

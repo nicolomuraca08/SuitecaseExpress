@@ -33,6 +33,8 @@ describe("buildPlan", () => {
   it("aggiunge protezioni meteo quando sono previste piogge", () => {
     const plan = buildPlan("Lisbona", "2026-04-10", "2026-04-12", "Trolley 10kg", "Coppia", {
       city: "Lisbona",
+      country: "Portogallo",
+      countryCode: "PT",
       timezone: "Europe/Lisbon",
       rainy: true,
       sunny: false,
