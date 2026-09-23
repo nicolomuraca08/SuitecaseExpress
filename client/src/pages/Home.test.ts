@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlan, validateContactForm } from "./Home";
+import { buildPlan, getContactFieldErrors, validateContactForm } from "./Home";
 
 describe("buildPlan", () => {
   it("genera tutte le categorie richieste e una giornata per ogni data", () => {
@@ -51,5 +51,11 @@ describe("buildPlan", () => {
     expect(validateContactForm("Anna", "anna@example.com", "")).toBe(false);
     expect(validateContactForm("Anna", "anna@example.com", "test")).toBe(false);
     expect(validateContactForm("Anna", "anna@example.com", "aaaaaaaaaaaaaa")).toBe(false);
+    expect(getContactFieldErrors("", "bad-email", "")).toEqual({
+      name: "Inserisci il tuo nome.",
+      email: "Inserisci un indirizzo email valido.",
+      message: "Scrivi il messaggio per il supporto.",
+    });
+    expect(getContactFieldErrors("Anna", "anna@example.com", "Ho bisogno di assistenza per il pagamento.")).toEqual({});
   });
 });
