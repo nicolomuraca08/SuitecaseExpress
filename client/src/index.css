@@ -174,7 +174,7 @@
   .insights-grid > div { padding: .9rem; border-radius: .9rem; background: rgba(255,255,255,.72); }
   .insights-grid h4 { margin-bottom: .35rem; color: #174c52; font-size: .82rem; font-weight: 900; }
   .insights-grid p, .insights-grid li { color: #526871; font-size: .78rem; line-height: 1.5; }
-  .contact-fab { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 30; display: inline-flex; align-items: center; gap: .45rem; min-height: 2.9rem; padding: .72rem 1rem; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; color: white; background: #123f4c; box-shadow: 0 12px 28px rgba(18,63,76,.22); font-size: .78rem; font-weight: 850; transition: transform .16s ease, background .16s ease, box-shadow .16s ease; }
+  .contact-fab { position: fixed; right: 1.25rem; bottom: calc(1.25rem + env(safe-area-inset-bottom)); z-index: 100; display: inline-flex !important; align-items: center; gap: .45rem; min-height: 2.9rem; padding: .72rem 1rem; border: 1px solid rgba(255,255,255,.72); border-radius: 999px; color: white; background: #123f4c; box-shadow: 0 12px 28px rgba(18,63,76,.22); font-size: .78rem; font-weight: 850; transition: transform .16s ease, background .16s ease, box-shadow .16s ease; }
   .contact-fab:hover { transform: translateY(-2px); background: #0b6470; box-shadow: 0 16px 32px rgba(18,63,76,.28); }
   .contact-fab:active { transform: scale(.97); }
   .contact-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background: rgba(10,35,42,.38); backdrop-filter: blur(7px); }
@@ -192,6 +192,8 @@
   .contact-success { display: flex; gap: .7rem; margin-top: 1rem; padding: .85rem; border-radius: .9rem; color: #087d63; background: #e8f8f1; font-size: .78rem; line-height: 1.45; }
   .contact-success strong { display: block; color: #075d4c; }
   .contact-success p { margin-top: .2rem; color: #43756c; }
+  .contact-footer-link { display: inline-flex; align-items: center; gap: .35rem; width: fit-content; border: 0; padding: 0; color: #087d63; background: transparent; font: inherit; font-weight: 800; }
+  .contact-footer-link span { text-decoration: underline; text-underline-offset: 2px; }
   @media (min-width: 760px) { .weather-widget { grid-template-columns: 1fr auto; align-items: center; } .insights-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (prefers-reduced-motion: no-preference) { .hero-orbit { animation: floatIn .7s cubic-bezier(.23,1,.32,1) both; } .form-card { animation: floatIn .7s .1s cubic-bezier(.23,1,.32,1) both; } }
   @keyframes floatIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -273,8 +275,9 @@
     .add-item-row button { min-height: 2.7rem; }
     .insights-card { padding: .95rem; }
     .insights-grid { gap: .55rem; }
-    .contact-fab { right: .85rem; bottom: .85rem; min-height: 2.75rem; padding: .7rem .85rem; }
+    .contact-fab { right: .85rem; bottom: calc(.85rem + env(safe-area-inset-bottom)); min-height: 3rem; padding: .78rem .95rem; font-size: .8rem; box-shadow: 0 10px 26px rgba(18,63,76,.32); }
     .contact-modal { padding: 1.25rem; }
+    .contact-footer-link { display: inline-flex; }
     footer.container { align-items: flex-start; padding-top: 1.25rem; padding-bottom: 1.5rem; }
   }
 }
