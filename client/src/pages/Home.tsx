@@ -5,8 +5,8 @@ import { jsPDF } from "jspdf";
 import {
   ArrowRight, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck,
   Copy, CreditCard, Download, FileText, Luggage, LockKeyhole, MapPin, Plane,
-  Plus, RotateCcw, ShieldCheck, Sparkles, SunMedium, Ticket, Trash2, Users,
-  WalletCards, Umbrella, Utensils, Coins, AlertTriangle, CloudRain, ThermometerSun,
+  Mail, Plus, RotateCcw, ShieldCheck, Sparkles, SunMedium, Ticket, Trash2, Users,
+  WalletCards, Umbrella, Utensils, Coins, AlertTriangle, CloudRain, ThermometerSun, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -167,7 +167,7 @@ function buildICS(plan: TravelPlan) {
 export default function Home() {
   const tomorrow = useMemo(() => { const date = new Date(); date.setDate(date.getDate() + 1); return dateInputValue(date); }, []);
   const defaultReturn = useMemo(() => addDays(tomorrow, 3), [tomorrow]);
-  const [destination, setDestination] = useState(""); const [startDate, setStartDate] = useState(tomorrow); const [endDate, setEndDate] = useState(defaultReturn); const [luggage, setLuggage] = useState<Luggage>("Trolley 10kg"); const [traveler, setTraveler] = useState<Traveler>("Da solo/a"); const [plan, setPlan] = useState<TravelPlan | null>(null); const [unlocked, setUnlocked] = useState(false); const [done, setDone] = useState<Record<string, boolean>>({}); const [notice, setNotice] = useState(""); const [weatherLoading, setWeatherLoading] = useState(false); const [weatherError, setWeatherError] = useState(""); const [newItem, setNewItem] = useState(""); const weatherRequest = useRef(0);
+  const [destination, setDestination] = useState(""); const [startDate, setStartDate] = useState(tomorrow); const [endDate, setEndDate] = useState(defaultReturn); const [luggage, setLuggage] = useState<Luggage>("Trolley 10kg"); const [traveler, setTraveler] = useState<Traveler>("Da solo/a"); const [plan, setPlan] = useState<TravelPlan | null>(null); const [unlocked, setUnlocked] = useState(false); const [done, setDone] = useState<Record<string, boolean>>({}); const [notice, setNotice] = useState(""); const [weatherLoading, setWeatherLoading] = useState(false); const [weatherError, setWeatherError] = useState(""); const [newItem, setNewItem] = useState(""); const [contactOpen, setContactOpen] = useState(false); const weatherRequest = useRef(0);
   const allItems = useMemo(() => plan?.categories.flatMap((category) => category.items) ?? [], [plan]); const doneCount = allItems.filter((item) => done[item]).length;
   const reportText = plan ? `VALIGIA PERFETTA · ${plan.destination}\n${readableDate(plan.startDate)} – ${readableDate(plan.endDate)} · ${plan.duration} giorni · ${plan.luggage} · ${plan.traveler}\n\nCHECKLIST\n${plan.categories.map((category) => `\n${category.title}\n${category.items.map((item) => `${done[item] ? "✓" : "□"} ${item}`).join("\n")}`).join("\n")}\n\nITINERARIO\n${plan.itinerary.map((day) => `\nGIORNO ${day.day} · ${readableDate(day.date)}\nMattina: ${day.morning}\nPomeriggio: ${day.afternoon}\nSera: ${day.evening}`).join("\n")}` : "";
 
@@ -200,5 +200,7 @@ export default function Home() {
       </div>}
     </main>
     <footer className="container flex flex-col gap-3 border-t border-slate-200/80 py-7 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>Valigia Perfetta · Progettato per partire più sereni.</p><p className="flex items-center gap-2"><ShieldCheck className="size-3.5 text-emerald-600" /> Pagamenti protetti da Stripe</p></footer>
+    <button type="button" className="contact-fab" aria-label="Apri contatti" onClick={() => setContactOpen(true)}><Mail className="size-5" /><span>Contatti</span></button>
+    {contactOpen && <div className="contact-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setContactOpen(false); }}><section className="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-title"><button type="button" className="contact-close" aria-label="Chiudi contatti" onClick={() => setContactOpen(false)}><X className="size-5" /></button><div className="contact-icon"><Mail className="size-6" /></div><p className="eyebrow text-emerald-700">Siamo qui per aiutarti</p><h2 id="contact-title" className="mt-2 font-display text-2xl font-black tracking-tight text-slate-950">Hai bisogno di aiuto?</h2><p className="mt-2 text-sm leading-6 text-slate-600">Scrivici per domande sul tuo itinerario, sul pagamento o sull’utilizzo dell’app.</p><a className="contact-email" href="mailto:suitecase.express@gmail.com?subject=Aiuto%20con%20Valigia%20Perfetta"><Mail className="size-4" /> Scrivici un’email <ArrowRight className="ml-auto size-4" /></a><p className="mt-3 text-center text-xs text-slate-400">suitecase.express@gmail.com</p></section></div>}
   </div>;
 }
