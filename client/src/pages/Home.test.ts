@@ -49,5 +49,7 @@ describe("buildPlan", () => {
     expect(validateContactForm("", "anna@example.com", "Ho bisogno di aiuto.")).toBe(false);
     expect(validateContactForm("Anna", "indirizzo-non-valido", "Ho bisogno di aiuto.")).toBe(false);
     expect(validateContactForm("Anna", "anna@example.com", "")).toBe(false);
+    expect(validateContactForm("Anna", "anna@example.com", "test")).toBe(false);
+    expect(validateContactForm("Anna", "anna@example.com", "aaaaaaaaaaaaaa")).toBe(false);
   });
 });

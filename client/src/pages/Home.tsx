@@ -110,7 +110,16 @@ export async function fetchDestinationInsights(destination: string, weather: Wea
 }
 
 export function validateContactForm(name: string, email: string, message: string) {
-  return Boolean(name.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && message.trim());
+  const cleanName = name.trim();
+  const cleanEmail = email.trim();
+  const cleanMessage = message.trim();
+  const nameIsValid = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .'-]{1,49}$/.test(cleanName) && cleanName.split(/\s+/).some((part) => part.length >= 2);
+  const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail);
+  const messageLetters = (cleanMessage.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g) ?? []).length;
+  const messageWords = cleanMessage.split(/\s+/).filter((word) => /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(word));
+  const repeatedText = /(.)\1{5,}/.test(cleanMessage.replace(/\s/g, ""));
+  const nonsenseMessage = /^(ciao|test|prova|asdf|qwerty|boh|bla|lol|ok)+[.!?\s]*$/i.test(cleanMessage);
+  return Boolean(nameIsValid && emailIsValid && cleanMessage.length >= 15 && cleanMessage.length <= 2000 && messageLetters >= 8 && messageWords.length >= 2 && !repeatedText && !nonsenseMessage);
 }
 
 export function buildPlan(destination: string, startDate: string, endDate: string, luggage: Luggage, traveler: Traveler, weather?: WeatherForecast, insights?: TravelInsights): TravelPlan {
@@ -189,7 +198,7 @@ export default function Home() {
   const addChecklistItem = () => { const item = newItem.trim(); if (!item || !plan) return; setPlan({ ...plan, categories: plan.categories.map((category) => category.title === "Extra" ? { ...category, items: [...category.items, item] } : category) }); setNewItem(""); };
   const removeChecklistItem = (categoryTitle: string, item: string) => { if (!plan) return; setPlan({ ...plan, categories: plan.categories.map((category) => category.title === categoryTitle ? { ...category, items: category.items.filter((value) => value !== item) } : category) }); setDone((current) => { const next = { ...current }; delete next[item]; return next; }); };
   const downloadICS = () => { if (!plan) return; const blob = new Blob([buildICS(plan)], { type: "text/calendar;charset=utf-8" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `itinerario-${plan.destination.toLowerCase().replace(/\s+/g, "-")}.ics`; link.click(); URL.revokeObjectURL(link.href); };
-  const submitContact = (event: FormEvent) => { event.preventDefault(); const name = contactName.trim(); const email = contactEmail.trim(); const message = contactMessage.trim(); if (!validateContactForm(name, email, message)) { setContactError("Completa tutti i campi con un indirizzo email valido."); setContactSent(false); return; } setContactError(""); setContactSent(true); const subject = encodeURIComponent(`Richiesta da ${name} · Valigia Perfetta`); const body = encodeURIComponent(`Nome: ${name}\nEmail: ${email}\n\nMessaggio:\n${message}`); window.location.href = `mailto:suitecase.express@gmail.com?subject=${subject}&body=${body}`; };
+  const submitContact = (event: FormEvent) => { event.preventDefault(); const name = contactName.trim(); const email = contactEmail.trim(); const message = contactMessage.trim(); if (!name || !email || !message) { setContactError("Compila tutti i campi prima di inviare la richiesta."); setContactSent(false); return; } if (!validateContactForm(name, email, message)) { setContactError("Inserisci un nome valido, un’email corretta e un messaggio di almeno 15 caratteri con una richiesta comprensibile."); setContactSent(false); return; } setContactError(""); setContactSent(true); const subject = encodeURIComponent(`Richiesta da ${name} · Valigia Perfetta`); const body = encodeURIComponent(`Nome: ${name}\nEmail: ${email}\n\nMessaggio:\n${message}`); window.location.href = `mailto:suitecase.express@gmail.com?subject=${subject}&body=${body}`; };
 
   return <div className="min-h-screen overflow-x-hidden bg-[#f8fbfa] text-slate-900">
     <header className="container flex items-center justify-between py-5 sm:py-7"><div className="flex items-center gap-3"><div className="brand-mark"><Plane className="size-5" /></div><div><p className="font-display text-lg font-black leading-none tracking-tight">Valigia Perfetta</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Itinerario Express</p></div></div><div className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm sm:flex"><ShieldCheck className="size-3.5 text-emerald-600" /> Pronto in 60 secondi</div></header>
