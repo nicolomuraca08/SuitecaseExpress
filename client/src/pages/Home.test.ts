@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlan } from "./Home";
+import { buildPlan, validateContactForm } from "./Home";
 
 describe("buildPlan", () => {
   it("genera tutte le categorie richieste e una giornata per ogni data", () => {
@@ -42,5 +42,12 @@ describe("buildPlan", () => {
     });
     const extras = plan.categories.find((category) => category.title === "Extra")?.items ?? [];
     expect(extras).toContain("Ombrello compatto o poncho impermeabile");
+  });
+
+  it("valida i campi del form contatti", () => {
+    expect(validateContactForm("Anna", "anna@example.com", "Ho bisogno di aiuto.")).toBe(true);
+    expect(validateContactForm("", "anna@example.com", "Ho bisogno di aiuto.")).toBe(false);
+    expect(validateContactForm("Anna", "indirizzo-non-valido", "Ho bisogno di aiuto.")).toBe(false);
+    expect(validateContactForm("Anna", "anna@example.com", "")).toBe(false);
   });
 });
