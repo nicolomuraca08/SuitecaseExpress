@@ -204,6 +204,10 @@
   .weather-notification-button:hover { border-color: #79cdb4; background: #effaf6; transform: translateY(-1px); }
   .weather-notification-button.is-active { border-color: #9bdcc8; color: #075d4c; background: #e7f8f1; }
   .notification-message { margin-top: .45rem; color: #4f726c; font-size: .7rem; font-weight: 700; }
+  .notification-switch-track { position: relative; display: inline-flex; align-items: center; width: 2rem; height: 1.15rem; padding: .15rem; border-radius: 999px; background: #c9d8d5; transition: background .18s ease; }
+  .notification-switch-thumb { display: block; width: .85rem; height: .85rem; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(15,48,58,.2); transform: translateX(0); transition: transform .18s ease; }
+  .weather-notification-button.is-active .notification-switch-track { background: #07966e; }
+  .weather-notification-button.is-active .notification-switch-thumb { transform: translateX(.85rem); }
   @media (min-width: 760px) { .weather-widget { grid-template-columns: 1fr auto; align-items: center; } .insights-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (prefers-reduced-motion: no-preference) { .hero-orbit { animation: floatIn .7s cubic-bezier(.23,1,.32,1) both; } .form-card { animation: floatIn .7s .1s cubic-bezier(.23,1,.32,1) both; } }
   @keyframes floatIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
