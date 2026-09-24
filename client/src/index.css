@@ -200,6 +200,10 @@
   @keyframes contactPop { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
   @keyframes contactReveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { .contact-success-check, .contact-success-animated { animation: none; } }
+  .weather-notification-button { display: inline-flex; align-items: center; gap: .4rem; margin-top: .8rem; border: 1px solid #cfe8df; border-radius: 999px; padding: .55rem .75rem; color: #087d63; background: white; font-size: .72rem; font-weight: 850; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+  .weather-notification-button:hover { border-color: #79cdb4; background: #effaf6; transform: translateY(-1px); }
+  .weather-notification-button.is-active { border-color: #9bdcc8; color: #075d4c; background: #e7f8f1; }
+  .notification-message { margin-top: .45rem; color: #4f726c; font-size: .7rem; font-weight: 700; }
   @media (min-width: 760px) { .weather-widget { grid-template-columns: 1fr auto; align-items: center; } .insights-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (prefers-reduced-motion: no-preference) { .hero-orbit { animation: floatIn .7s cubic-bezier(.23,1,.32,1) both; } .form-card { animation: floatIn .7s .1s cubic-bezier(.23,1,.32,1) both; } }
   @keyframes floatIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
