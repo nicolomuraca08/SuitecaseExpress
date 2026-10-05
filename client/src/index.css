@@ -184,6 +184,7 @@
   .contact-icon { display: grid; place-items: center; width: 3rem; height: 3rem; margin-bottom: 1rem; border-radius: .95rem; color: #087d63; background: #e6f7f0; }
   .contact-email { display: flex; align-items: center; gap: .55rem; margin-top: 1.25rem; padding: .85rem 1rem; border-radius: .9rem; color: white; background: #07966e; font-size: .85rem; font-weight: 850; text-decoration: none; transition: background .16s ease, transform .16s ease; }
   .contact-email:hover { background: #067b5c; transform: translateY(-1px); }
+  .contact-email:disabled { cursor: wait; opacity: .72; transform: none; }
   .contact-form { display: grid; gap: .75rem; margin-top: 1rem; }
   .contact-form label { display: grid; gap: .35rem; color: #45616a; font-size: .72rem; font-weight: 850; }
   .contact-form input, .contact-form textarea { width: 100%; border: 1px solid #d9e8e3; border-radius: .75rem; padding: .7rem .75rem; outline: 0; color: #18303d; background: #fbfefd; font: 650 .8rem/1.45 "Manrope", sans-serif; resize: vertical; }
