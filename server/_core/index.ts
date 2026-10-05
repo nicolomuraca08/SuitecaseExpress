@@ -31,9 +31,32 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  const contactRateLimit = new Map<string, number>();
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.post("/api/recaptcha/verify", async (req, res) => {
+    const secret = process.env.RECAPTCHA_SECRET_KEY;
+    const token = typeof req.body?.token === "string" ? req.body.token : "";
+    if (!secret) return res.status(503).json({ ok: false, message: "reCAPTCHA non configurato." });
+    if (!token) return res.status(400).json({ ok: false, message: "Token reCAPTCHA mancante." });
+    const clientKey = req.ip || req.socket.remoteAddress || "unknown";
+    const lastRequest = contactRateLimit.get(clientKey) ?? 0;
+    if (Date.now() - lastRequest < 60_000) return res.status(429).json({ ok: false, message: "Attendi un minuto prima di inviare un’altra richiesta." });
+    try {
+      const verification = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ secret, response: token }),
+      });
+      const result = await verification.json() as { success?: boolean; score?: number; action?: string };
+      if (!verification.ok || !result.success || (result.score ?? 0) < 0.5 || result.action !== "contact_submit") return res.status(403).json({ ok: false, message: "Verifica anti-spam non superata." });
+      contactRateLimit.set(clientKey, Date.now());
+      return res.json({ ok: true });
+    } catch {
+      return res.status(502).json({ ok: false, message: "Verifica anti-spam non disponibile." });
+    }
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // tRPC API
