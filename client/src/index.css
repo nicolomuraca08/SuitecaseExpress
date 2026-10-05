@@ -207,6 +207,8 @@
   .contact-field-error { color: #c24138; font-size: .68rem; font-weight: 750; line-height: 1.35; }
   .contact-spam-question { color: #174c52; font-size: .75rem; font-weight: 900; }
   .contact-form-error { margin: 0; color: #bd3c35; font-size: .72rem; font-weight: 750; }
+  .contact-cooldown { margin: 0; padding: .6rem .7rem; border-radius: .7rem; color: #526b76; background: #f1f8fa; font-size: .7rem; font-weight: 700; line-height: 1.4; text-align: center; }
+  .contact-cooldown strong { color: #087f9f; }
   .contact-success { display: flex; gap: .7rem; margin-top: 1rem; padding: .85rem; border-radius: .9rem; color: #087d63; background: #e8f8f1; font-size: .78rem; line-height: 1.45; }
   .contact-success strong { display: block; color: #075d4c; }
   .contact-success p { margin-top: .2rem; color: #43756c; }
