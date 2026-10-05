@@ -205,6 +205,10 @@
   .contact-form input:focus, .contact-form textarea:focus, .contact-form select:focus { border-color: #16a37e; box-shadow: 0 0 0 3px rgba(22,163,126,.1); }
   .contact-form input[aria-invalid="true"], .contact-form textarea[aria-invalid="true"], .contact-form select[aria-invalid="true"] { border-color: #dc5b53; background: #fffafa; }
   .contact-field-error { color: #c24138; font-size: .68rem; font-weight: 750; line-height: 1.35; }
+  .contact-form input[type="file"] { padding: .55rem; color: #526b76; font-size: .72rem; }
+  .contact-attachment-selected { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #087d63; font-size: .68rem; font-weight: 800; overflow-wrap: anywhere; }
+  .contact-attachment-selected button { flex: none; border: 0; color: #bd3c35; background: transparent; font-size: .68rem; font-weight: 850; text-decoration: underline; }
+  .contact-attachment-help { color: #82969d; font-size: .64rem; font-weight: 650; }
   .contact-spam-question { color: #174c52; font-size: .75rem; font-weight: 900; }
   .contact-form-error { margin: 0; color: #bd3c35; font-size: .72rem; font-weight: 750; }
   .contact-cooldown { margin: 0; padding: .6rem .7rem; border-radius: .7rem; color: #526b76; background: #f1f8fa; font-size: .7rem; font-weight: 700; line-height: 1.4; text-align: center; }
