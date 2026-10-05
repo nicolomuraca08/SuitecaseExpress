@@ -213,6 +213,8 @@
   .contact-dropzone-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; color: #087f9f; background: #d8f2ff; font-size: 1.35rem; font-weight: 900; }
   .contact-dropzone strong { color: #315c69; font-size: .76rem; }
   .contact-attachment-selected { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #087d63; font-size: .68rem; font-weight: 800; overflow-wrap: anywhere; }
+  .contact-attachment-selected strong { color: #087f9f; }
+  .contact-attachment-selected em { color: #82969d; font-style: normal; }
   .contact-attachment-selected button { flex: none; border: 0; color: #bd3c35; background: transparent; font-size: .68rem; font-weight: 850; text-decoration: underline; }
   .contact-attachment-help { color: #82969d; font-size: .64rem; font-weight: 650; }
   .contact-spam-question { color: #174c52; font-size: .75rem; font-weight: 900; }
