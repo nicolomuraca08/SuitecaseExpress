@@ -187,10 +187,11 @@
   .contact-email:disabled { cursor: wait; opacity: .72; transform: none; }
   .contact-form { display: grid; gap: .75rem; margin-top: 1rem; }
   .contact-form label { display: grid; gap: .35rem; color: #45616a; font-size: .72rem; font-weight: 850; }
-  .contact-form input, .contact-form textarea { width: 100%; border: 1px solid #d9e8e3; border-radius: .75rem; padding: .7rem .75rem; outline: 0; color: #18303d; background: #fbfefd; font: 650 .8rem/1.45 "Manrope", sans-serif; resize: vertical; }
-  .contact-form input:focus, .contact-form textarea:focus { border-color: #16a37e; box-shadow: 0 0 0 3px rgba(22,163,126,.1); }
-  .contact-form input[aria-invalid="true"], .contact-form textarea[aria-invalid="true"] { border-color: #dc5b53; background: #fffafa; }
+  .contact-form input, .contact-form textarea, .contact-form select { width: 100%; border: 1px solid #d9e8e3; border-radius: .75rem; padding: .7rem .75rem; outline: 0; color: #18303d; background: #fbfefd; font: 650 .8rem/1.45 "Manrope", sans-serif; resize: vertical; }
+  .contact-form input:focus, .contact-form textarea:focus, .contact-form select:focus { border-color: #16a37e; box-shadow: 0 0 0 3px rgba(22,163,126,.1); }
+  .contact-form input[aria-invalid="true"], .contact-form textarea[aria-invalid="true"], .contact-form select[aria-invalid="true"] { border-color: #dc5b53; background: #fffafa; }
   .contact-field-error { color: #c24138; font-size: .68rem; font-weight: 750; line-height: 1.35; }
+  .contact-spam-question { color: #174c52; font-size: .75rem; font-weight: 900; }
   .contact-form-error { margin: 0; color: #bd3c35; font-size: .72rem; font-weight: 750; }
   .contact-success { display: flex; gap: .7rem; margin-top: 1rem; padding: .85rem; border-radius: .9rem; color: #087d63; background: #e8f8f1; font-size: .78rem; line-height: 1.45; }
   .contact-success strong { display: block; color: #075d4c; }

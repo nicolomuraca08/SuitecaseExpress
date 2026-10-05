@@ -51,11 +51,14 @@ describe("buildPlan", () => {
     expect(validateContactForm("Anna", "anna@example.com", "")).toBe(false);
     expect(validateContactForm("Anna", "anna@example.com", "test")).toBe(false);
     expect(validateContactForm("Anna", "anna@example.com", "aaaaaaaaaaaaaa")).toBe(false);
-    expect(getContactFieldErrors("", "bad-email", "")).toEqual({
+    expect(getContactFieldErrors("", "bad-email", "", "", "")).toEqual({
       name: "Inserisci il tuo nome.",
       email: "Inserisci un indirizzo email valido.",
+      topic: "Seleziona l’argomento della richiesta.",
       message: "Scrivi il messaggio per il supporto.",
+      spam: "Rispondi correttamente alla domanda per confermare che sei una persona.",
     });
-    expect(getContactFieldErrors("Anna", "anna@example.com", "Ho bisogno di assistenza per il pagamento.")).toEqual({});
+    expect(getContactFieldErrors("Anna", "anna@example.com", "Supporto", "Ho bisogno di assistenza per il pagamento.", "7")).toEqual({});
+    expect(getContactFieldErrors("Anna", "anna@example.com", "Supporto", "Ho bisogno di assistenza per il pagamento.", "8").spam).toContain("Rispondi correttamente");
   });
 });
