@@ -206,6 +206,12 @@
   .contact-form input[aria-invalid="true"], .contact-form textarea[aria-invalid="true"], .contact-form select[aria-invalid="true"] { border-color: #dc5b53; background: #fffafa; }
   .contact-field-error { color: #c24138; font-size: .68rem; font-weight: 750; line-height: 1.35; }
   .contact-form input[type="file"] { padding: .55rem; color: #526b76; font-size: .72rem; }
+  .contact-dropzone { position: relative; display: grid; justify-items: center; gap: .25rem; border: 1.5px dashed #9dd3e4; border-radius: .85rem; padding: 1rem .75rem; color: #5b7580; background: #f5fcff; font-size: .7rem; text-align: center; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+  .contact-dropzone input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; opacity: 0; cursor: pointer; }
+  .contact-dropzone.is-dragging { border-color: #087f9f; background: #e5f7ff; transform: translateY(-1px); }
+  .contact-dropzone.is-full { border-color: #cbd9dd; color: #82969d; background: #f5f8f8; }
+  .contact-dropzone-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; color: #087f9f; background: #d8f2ff; font-size: 1.35rem; font-weight: 900; }
+  .contact-dropzone strong { color: #315c69; font-size: .76rem; }
   .contact-attachment-selected { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #087d63; font-size: .68rem; font-weight: 800; overflow-wrap: anywhere; }
   .contact-attachment-selected button { flex: none; border: 0; color: #bd3c35; background: transparent; font-size: .68rem; font-weight: 850; text-decoration: underline; }
   .contact-attachment-help { color: #82969d; font-size: .64rem; font-weight: 650; }
