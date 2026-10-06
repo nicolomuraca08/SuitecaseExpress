@@ -224,6 +224,7 @@
   .contact-attachment-progress.is-full .contact-attachment-progress-track span { background: #d64545; }
   .contact-attachment-progress-label { min-width: 5.5rem; color: #526b76; font-size: .64rem; font-weight: 850; text-align: right; }
   .contact-attachment-warning { display: block; margin-top: .25rem; padding: .55rem .65rem; border-radius: .65rem; color: #9a5a08; background: #fff4dc; font-size: .68rem; font-weight: 800; line-height: 1.4; }
+  .contact-attachment-limit-error { display: block; margin-top: .25rem; color: #c33737; font-size: .68rem; font-weight: 850; line-height: 1.4; }
   .contact-spam-question { color: #174c52; font-size: .75rem; font-weight: 900; }
   .contact-form-error { margin: 0; color: #bd3c35; font-size: .72rem; font-weight: 750; }
   .contact-cooldown { margin: 0; padding: .6rem .7rem; border-radius: .7rem; color: #526b76; background: #f1f8fa; font-size: .7rem; font-weight: 700; line-height: 1.4; text-align: center; }
