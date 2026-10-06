@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { trpc } from "@/lib/trpc";
 
 type Month = "Gennaio" | "Febbraio" | "Marzo" | "Aprile" | "Maggio" | "Giugno" | "Luglio" | "Agosto" | "Settembre" | "Ottobre" | "Novembre" | "Dicembre";
 type Luggage = "Solo Zaino" | "Trolley 10kg" | "Stiva";
@@ -227,8 +226,18 @@ function StripeCheckoutForm({ onPaid }: { onPaid: () => void }) {
 
 function Paywall({ plan, onPaid }: { plan: TravelPlan; onPaid: () => void }) {
   const [clientSecret, setClientSecret] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  const createIntent = trpc.payment.createIntent.useMutation({ onSuccess: ({ clientSecret: secret }) => setClientSecret(secret), onError: (err) => setError(err.message) });
-  const startPayment = () => { setError(""); if (!stripePromise) { onPaid(); return; } setLoading(true); createIntent.mutate({ destination: plan.destination, duration: plan.duration }, { onSettled: () => setLoading(false) }); };
+  const startPayment = async () => {
+    setError("");
+    if (!stripePromise) { onPaid(); return; }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/create-payment-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destination: plan.destination, duration: plan.duration }) });
+      const data = await response.json() as { clientSecret?: string; error?: string };
+      if (!response.ok || !data.clientSecret) throw new Error(data.error ?? "Impossibile preparare il pagamento.");
+      setClientSecret(data.clientSecret);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossibile preparare il pagamento."); }
+    finally { setLoading(false); }
+  };
   return <section className="paywall-card" aria-labelledby="unlock-title"><div className="paywall-lock"><LockKeyhole className="size-5" /></div><p className="eyebrow text-emerald-700">Il tuo piano è pronto</p><h2 id="unlock-title" className="mt-2 font-display text-3xl font-black tracking-tight text-slate-950">Una valigia più leggera. Un viaggio più pieno.</h2><p className="mt-3 max-w-xl text-base leading-7 text-slate-600">Sblocca tutte le categorie, il meteo e ogni tappa personalizzata per {plan.destination}.</p><div className="mt-5 grid gap-3 sm:grid-cols-3">{[[<ClipboardCheck className="size-4" />, "Checklist completa"], [<CalendarDays className="size-4" />, `${plan.duration} giorni organizzati`], [<FileText className="size-4" />, "PDF e calendario"]].map(([icon, label]) => <div key={label as string} className="benefit-pill">{icon}<span>{label}</span></div>)}</div><div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-4 sm:p-5">{!clientSecret ? <><div className="mb-4 flex items-center justify-between gap-4"><div><p className="font-bold text-slate-900">Sblocco una tantum</p><p className="text-sm text-slate-500">Valigia + itinerario completo</p></div><span className="price-tag">3,99 €</span></div><Button onClick={startPayment} disabled={loading} className="w-full rounded-2xl bg-emerald-600 py-6 text-base font-bold text-white hover:bg-emerald-700">{loading ? "Preparo il pagamento…" : stripePromise ? <><CreditCard className="size-4" /> Continua al pagamento sicuro</> : <><Sparkles className="size-4" /> Sblocca anteprima demo</>} <ArrowRight className="size-4" /></Button>{!stripePromise && <p className="mt-3 text-center text-xs text-slate-500">Modalità demo: configura le chiavi Stripe per attivare il pagamento reale.</p>}{error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}</> : <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#059669", borderRadius: "16px", fontFamily: "Manrope, sans-serif" } } }}><StripeCheckoutForm onPaid={onPaid} /></Elements>}</div></section>;
 }
 

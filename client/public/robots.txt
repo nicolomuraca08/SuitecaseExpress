@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://valigia-perfetta-itinerario-express.vercel.app/sitemap.xml
